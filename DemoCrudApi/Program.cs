@@ -32,9 +32,17 @@ using (var scope = app.Services.CreateScope())
 
 // CRUD Endpoints for Product
 
-// GET /products - Get all products
-app.MapGet("/products", async (AppDbContext db) =>
-    await db.Products.ToListAsync())
+// GET /products - Get all products with optional pagination
+app.MapGet("/products", async (int? page, int? size, AppDbContext db) =>
+{
+    var query = db.Products.AsQueryable();
+    if (page.HasValue && size.HasValue)
+    {
+        var skip = (page.Value - 1) * size.Value;
+        query = query.Skip(skip).Take(size.Value);
+    }
+    return await query.ToListAsync();
+})
 .WithName("GetProducts")
 .WithOpenApi();
 
@@ -50,10 +58,10 @@ app.MapGet("/products/{id:int}", async (int id, AppDbContext db) =>
 app.MapPost("/products", async (Product product, AppDbContext db) =>
 {
     if (string.IsNullOrWhiteSpace(product.Name) || product.Name.Length > 100)
-        return Results.BadRequest("Name is required and must be 100 characters or less.");
+        return Results.Problem("Name is required and must be 100 characters or less.", statusCode: 400);
 
     if (product.Price <= 0)
-        return Results.BadRequest("Price must be greater than 0.");
+        return Results.Problem("Price must be greater than 0.", statusCode: 400);
 
     db.Products.Add(product);
     await db.SaveChangesAsync();
@@ -69,10 +77,10 @@ app.MapPut("/products/{id:int}", async (int id, Product inputProduct, AppDbConte
     if (product is null) return Results.NotFound();
 
     if (string.IsNullOrWhiteSpace(inputProduct.Name) || inputProduct.Name.Length > 100)
-        return Results.BadRequest("Name is required and must be 100 characters or less.");
+        return Results.Problem("Name is required and must be 100 characters or less.", statusCode: 400);
 
     if (inputProduct.Price <= 0)
-        return Results.BadRequest("Price must be greater than 0.");
+        return Results.Problem("Price must be greater than 0.", statusCode: 400);
 
     product.Name = inputProduct.Name;
     product.Price = inputProduct.Price;
